@@ -1,0 +1,5 @@
+git remote add origin git@github.com:Syakir0/LMJ.git     
+ini adalah alamat untuk push ke git d
+dan pus ke gitu dengan nama LMJ  01 
+dan gi ginore file 2 yang ngk ble di up kesana 
+tentunya file txt  jangan di up

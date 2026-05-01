@@ -1,0 +1,2 @@
+@echo off
+powershell -Command "$c = Get-Content D:\php_runtime\php.ini; $c = $c -replace ';extension_dir = \"ext\"', 'extension_dir = \"ext\"'; $c = $c -replace ';extension=openssl', 'extension=openssl'; $c = $c -replace ';extension=pdo_mysql', 'extension=pdo_mysql'; $c = $c -replace ';extension=mbstring', 'extension=mbstring'; $c = $c -replace ';extension=curl', 'extension=curl'; $c = $c -replace ';extension=fileinfo', 'extension=fileinfo'; $c | Set-Content D:\php_runtime\php.ini"

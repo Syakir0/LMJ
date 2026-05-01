@@ -1,0 +1,607 @@
+Bertindaklah sebagai Senior Full-Stack Engineer & UI/UX Developer spesialis Laravel + Tailwind CSS.
+
+Saya melanjutkan project LMJ-V2 yang backend-nya sudah selesai dibangun.
+Sekarang saya butuh implementasi UI lengkap dan terstruktur.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KONTEKS BACKEND YANG SUDAH ADA (JANGAN DIUBAH):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+app/Models/
+  ├── Customer.php          → hasOne(RadCheck), hasMany(RadAcct), belongsTo(Package)
+  ├── Package.php           → hasMany(Customer), hasMany(RadGroupReply)
+  ├── RadCheck.php          → connection: 'radius'
+  ├── RadAcct.php           → connection: 'radius'
+  ├── NetworkDevice.php     → hasMany(Alert)
+  └── Alert.php             → belongsTo(NetworkDevice)
+
+app/Services/
+  ├── MikroTikService.php   → getActivePppoe(), ping(), disconnectUser()
+  └── TelegramService.php   → send(), sendToAdmin(), sendToNoc()
+
+app/Observers/
+  └── CustomerObserver.php  → auto-sync ke radcheck saat CRUD Customer
+
+Stack UI yang WAJIB digunakan:
+  ▸ Blade Templates + Laravel Components
+  ▸ Tailwind CSS 3.x + DaisyUI 4.x (component library)
+  ▸ Alpine.js 3.x (reactivity, modal, dropdown — tanpa Vue/React)
+  ▸ Chart.js 4.x (grafik bandwidth, usage, pie chart paket)
+  ▸ DataTables.js (server-side processing untuk tabel besar)
+  ▸ Font Awesome 6 Free (icons)
+  ▸ Axios (HTTP requests ke API internal)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 1 — STRUKTUR FILE & ARSITEKTUR UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Buatkan struktur folder Blade yang lengkap sebelum menulis
+satu baris HTML pun. Ikuti konvensi ini PERSIS:
+
+resources/views/
+  ├── layouts/
+  │   ├── app.blade.php          → layout utama (sidebar + topbar + content slot)
+  │   ├── auth.blade.php         → layout login/register (centered, no sidebar)
+  │   └── partials/
+  │       ├── sidebar.blade.php  → navigasi kiri
+  │       ├── topbar.blade.php   → header atas
+  │       └── footer.blade.php   → footer minimal
+  │
+  ├── components/
+  │   ├── stat-card.blade.php    → kartu statistik (reusable, props: title, value, icon, color)
+  │   ├── alert-badge.blade.php  → badge severity (info/warning/critical)
+  │   ├── device-status.blade.php → dot indicator online/offline/degraded
+  │   ├── bandwidth-chart.blade.php → wrapper Chart.js (props: device_id, range)
+  │   ├── modal.blade.php        → modal generic (props: id, title, size)
+  │   └── data-table.blade.php   → wrapper DataTables (props: id, columns, ajax_url)
+  │
+  ├── auth/
+  │   ├── login.blade.php
+  │   └── profile.blade.php
+  │
+  ├── dashboard/
+  │   └── index.blade.php        → halaman overview utama
+  │
+  ├── customers/
+  │   ├── index.blade.php        → list pelanggan (DataTable)
+  │   ├── show.blade.php         → detail 1 pelanggan
+  │   └── partials/
+  │       ├── form-modal.blade.php   → modal add/edit customer
+  │       └── stats-panel.blade.php  → panel usage & history
+  │
+  ├── packages/
+  │   ├── index.blade.php        → list paket internet
+  │   └── partials/
+  │       └── form-modal.blade.php
+  │
+  ├── devices/
+  │   ├── index.blade.php        → grid semua network devices
+  │   ├── show.blade.php         → detail 1 device (5 section)
+  │   └── partials/
+  │       ├── metric-gauges.blade.php   → CPU/RAM gauge real-time
+  │       ├── traffic-chart.blade.php   → chart per interface
+  │       ├── sessions-table.blade.php  → PPPoE active sessions
+  │       └── alert-timeline.blade.php  → history alert device
+  │
+  ├── monitoring/
+  │   └── live.blade.php         → live monitoring semua devices
+  │
+  ├── alerts/
+  │   └── index.blade.php        → alert center + Telegram config
+  │
+  ├── reports/
+  │   └── index.blade.php        → laporan + export CSV
+  │
+  └── settings/
+      ├── index.blade.php        → pengaturan umum
+      ├── telegram.blade.php     → konfigurasi Telegram bot
+      └── users.blade.php        → manajemen user dashboard
+
+routes/web.php — struktur route yang dibutuhkan:
+  Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::resource('customers', CustomerController::class);
+    Route::resource('packages', PackageController::class);
+    Route::resource('devices', NetworkDeviceController::class);
+    Route::get('/monitoring/live', [MonitoringController::class, 'live']);
+    Route::get('/alerts', [AlertController::class, 'index']);
+    Route::get('/reports', [ReportController::class, 'index']);
+    Route::get('/settings/telegram', [SettingController::class, 'telegram']);
+  });
+
+routes/api.php — endpoint yang dikonsumsi UI via Axios:
+  /api/v1/dashboard/summary        → stat cards data
+  /api/v1/devices/{id}/metrics     → CPU, RAM, uptime live
+  /api/v1/devices/{id}/traffic     → data grafik bandwidth
+  /api/v1/devices/{id}/sessions    → PPPoE sessions aktif
+  /api/v1/mikrotik/active          → semua active PPPoE lintas device
+  /api/v1/alerts                   → daftar alert aktif
+  /api/v1/customers/datatable      → server-side DataTables
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 2 — DESIGN SYSTEM & LAYOUT UTAMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2.1 Design Tokens (tailwind.config.js)
+Berikan konfigurasi Tailwind yang extend dengan brand colors
+LMJ-V2 ISP:
+
+  colors:
+    brand:
+      primary: '#0F6E56'      → teal gelap (header, sidebar aktif)
+      secondary: '#1D9E75'    → teal medium (tombol utama, badge online)
+      accent: '#5DCAA5'       → teal muda (hover, highlight)
+    status:
+      online: '#22c55e'       → hijau (device/user online)
+      offline: '#ef4444'      → merah (device/user offline)
+      degraded: '#f59e0b'     → kuning (warning, degraded)
+      unknown: '#6b7280'      → abu (status tidak diketahui)
+    severity:
+      info: '#3b82f6'
+      warning: '#f59e0b'
+      critical: '#ef4444'
+
+2.2 layouts/app.blade.php
+Berikan kode Blade LENGKAP untuk layout utama dengan struktur:
+
+  ┌─────────────────────────────────────────────────┐
+  │  SIDEBAR (w-64, fixed, scrollable)              │
+  │  ┌─────────────────────────────────────────┐    │
+  │  │ Logo LMJ-V2 + ISP Name                  │    │
+  │  ├─────────────────────────────────────────┤    │
+  │  │ 🏠 Dashboard                            │    │
+  │  │ 👥 Pelanggan          [badge: total]    │    │
+  │  │ 📦 Paket Internet                       │    │
+  │  │ 🖥️ Network Devices   [badge: offline]  │    │
+  │  │ 📡 Monitoring Live   [dot: pulse]       │    │
+  │  │ 📊 Laporan                              │    │
+  │  │ 🔔 Alert Center      [badge: aktif]     │    │
+  │  ├─────────────────────────────────────────┤    │
+  │  │ ⚙️ Pengaturan                          │    │
+  │  │ 👤 [nama user] · Logout                │    │
+  │  └─────────────────────────────────────────┘    │
+  │                                                  │
+  │  MAIN CONTENT (ml-64)                           │
+  │  ┌─────────────────────────────────────────┐    │
+  │  │ TOPBAR (sticky)                         │    │
+  │  │ [Page Title]    [🔔 alerts] [👤 user]  │    │
+  │  ├─────────────────────────────────────────┤    │
+  │  │ @yield('content')                       │    │
+  │  └─────────────────────────────────────────┘    │
+  └─────────────────────────────────────────────────┘
+
+  Requirement layout:
+  ▸ Sidebar collapse: toggle via Alpine.js → simpan state ke
+    localStorage agar ingat posisi setelah refresh.
+  ▸ Active menu highlight: gunakan Route::currentRouteName()
+    untuk detect halaman aktif.
+  ▸ Badge sidebar: offline devices dan active alerts
+    di-refresh setiap 60 detik via Alpine.js + Axios.
+  ▸ Topbar: breadcrumb dinamis + nama user yang login +
+    notification bell (dropdown 5 alert terbaru).
+  ▸ Dark mode toggle: simpan preferensi ke localStorage,
+    apply class 'dark' ke <html> tag.
+  ▸ Mobile responsive: sidebar jadi drawer overlay di < lg.
+
+2.3 Reusable Blade Components
+Berikan kode untuk setiap component di components/:
+
+  A. <x-stat-card>
+     Props: title, value, subtitle, icon, color, trend (up/down/neutral)
+     Tampilan: icon bulat di kiri, value besar di tengah,
+     trend arrow + persentase perubahan di bawah.
+     Contoh penggunaan:
+     <x-stat-card
+       title="Pelanggan Online"
+       :value="$onlineCount"
+       icon="wifi"
+       color="success"
+       trend="up"
+       trend-value="+3 dari kemarin"
+     />
+
+  B. <x-device-status>
+     Props: status (online/offline/degraded/unknown), show-label
+     Tampilan: dot berwarna + animasi pulse jika online +
+     label teks opsional.
+
+  C. <x-alert-badge>
+     Props: severity (info/warning/critical), count (opsional)
+     Tampilan: pill badge dengan warna sesuai severity.
+
+  D. <x-modal>
+     Props: id, title, size (sm/md/lg/xl)
+     Alpine.js controlled: x-show + @keydown.escape.window
+     Backdrop click untuk close.
+     Slot: default (body), footer (tombol aksi).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 3 — HALAMAN DASHBOARD OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: resources/views/dashboard/index.blade.php
+Controller: DashboardController@index — inject data:
+  $summary = [
+    'customers_online'  => int,
+    'customers_offline' => int,
+    'rx_today_gb'       => float,
+    'tx_today_gb'       => float,
+    'devices_online'    => int,
+    'devices_offline'   => int,
+    'active_alerts'     => int,
+    'server_uptime'     => string,
+  ]
+
+Layout halaman (top → bottom):
+
+SECTION 1 — Stat Cards Row (2x4 grid, auto-refresh 30 detik)
+  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+  │ Online   │ │ Offline  │ │ Rx Today │ │ Tx Today │
+  │   📶     │ │   📵     │ │  ⬇ GB   │ │  ⬆ GB   │
+  │  [num]   │ │  [num]   │ │ [value]  │ │ [value]  │
+  └──────────┘ └──────────┘ └──────────┘ └──────────┘
+  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+  │ Devices  │ │Dev Offl  │ │ Alerts   │ │ Uptime   │
+  │  Online  │ │  [RED]   │ │ Aktif    │ │ Server   │
+  │  [num]   │ │  [num]   │ │  [num]   │ │ [time]   │
+  └──────────┘ └──────────┘ └──────────┘ └──────────┘
+
+SECTION 2 — Split Layout (2 kolom)
+  Kiri (60%): Bandwidth Chart 24 jam (Line Chart, Rx+Tx)
+    ▸ Data dari: GET /api/v1/dashboard/traffic-chart
+    ▸ Auto-refresh setiap 5 menit (update data Chart.js tanpa reload)
+    ▸ Toggle: tampilkan Rx saja / Tx saja / keduanya
+    ▸ Selector time range: 6h / 12h / 24h
+
+  Kanan (40%): Device Status Grid
+    ▸ Card kecil per device: nama, IP, tipe icon, status dot,
+      last ping ms, mini CPU bar
+    ▸ Klik card → navigate ke /devices/{id}
+    ▸ Auto-refresh setiap 30 detik
+
+SECTION 3 — Split Layout (2 kolom)
+  Kiri (65%): Live PPPoE Sessions Table (top 10, auto-refresh 15 detik)
+    Kolom: Username | IP | Paket | Uptime | ↓ Rx | ↑ Tx | Aksi
+    ▸ Tombol Disconnect per baris (confirm dialog)
+    ▸ Row highlight: merah jika user flagged sebagai suspended
+    ▸ Link "Lihat Semua" → /monitoring/live
+
+  Kanan (35%): Alert Feed
+    ▸ 5 alert terbaru (auto-refresh 30 detik)
+    ▸ Tiap alert: severity icon + device name + message + waktu ago
+    ▸ Tombol Acknowledge per alert
+    ▸ Link "Semua Alert" → /alerts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 4 — HALAMAN MANAJEMEN PELANGGAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4.1 customers/index.blade.php
+
+  TOPBAR ACTIONS:
+  [🔍 Search] [Filter: Status ▼] [Filter: Paket ▼] [+ Tambah Pelanggan]
+
+  DATATABLE (server-side via /api/v1/customers/datatable):
+  Kolom:
+  ┌─────┬──────────────┬────────────┬──────────┬──────────┬──────────┬─────────────────────┐
+  │ No  │ Pelanggan    │ Username   │ Paket    │ Status   │ Expired  │ Aksi                │
+  ├─────┼──────────────┼────────────┼──────────┼──────────┼──────────┼─────────────────────┤
+  │  1  │ Budi Santoso │ budi.2024  │ 10Mbps   │ 🟢Online │ 30 Jan   │ [Detail][Edit][⋮]  │
+  └─────┴──────────────┴────────────┴──────────┴──────────┴──────────┴─────────────────────┘
+
+  Kolom Status: badge warna (Online=hijau, Offline=abu,
+    Suspended=merah, Expired=oranye)
+  Kolom Aksi dropdown [⋮]:
+    → Lihat Detail
+    → Edit Data
+    → Reset Password
+    → Suspend / Aktifkan
+    → Hapus (danger, confirm modal)
+
+4.2 Modal Add/Edit Customer (customers/partials/form-modal.blade.php)
+  Alpine.js controlled, ukuran: max-w-2xl
+
+  FORM FIELDS:
+  ┌─────────────────────────────────────┐
+  │ Informasi Pelanggan                 │
+  │ Nama Lengkap *         [____________]│
+  │ Email                  [____________]│
+  │ No. Telepon            [____________]│
+  │ Alamat                 [____________]│
+  │                                     │
+  │ Data Akun PPPoE                     │
+  │ Username *             [____________]│
+  │                        cek realtime →│
+  │                        [✓ tersedia] │
+  │ Password *             [________👁] │
+  │                        [strength bar]│
+  │ Konfirmasi Password *  [________👁] │
+  │                                     │
+  │ Paket Internet *       [dropdown   ▼]│
+  │                        → preview kecepatan setelah pilih │
+  │ Tanggal Expired *      [date picker] │
+  │ Catatan                [textarea   ] │
+  │                                     │
+  │              [Batal]  [Simpan]      │
+  └─────────────────────────────────────┘
+
+  Validasi realtime (Alpine.js):
+  ▸ Username: cek via GET /api/v1/customers/check-username
+    debounce 500ms → tampilkan ✓/✗ di samping field
+  ▸ Password strength bar: lemah/sedang/kuat berdasarkan panjang
+    dan karakter campuran
+  ▸ Semua field required ditandai * + highlight merah jika kosong saat submit
+
+4.3 customers/show.blade.php — Detail Pelanggan
+
+  HEADER: Avatar initials + Nama + Badge status + Tombol aksi
+  (Edit, Reset Password, Suspend/Aktifkan, Hapus)
+
+  TAB NAVIGATION (Alpine.js tab):
+  [📋 Profil] [📊 Statistik] [📡 Koneksi] [🧾 Tagihan]
+
+  TAB 1 — Profil:
+    Data lengkap pelanggan + data akun PPPoE + info paket
+
+  TAB 2 — Statistik:
+    ▸ Usage summary: total Rx/Tx bulan ini (cards kecil)
+    ▸ Bar chart: daily usage 30 hari terakhir (Chart.js)
+    ▸ Rata-rata session duration
+
+  TAB 3 — Koneksi:
+    ▸ Status saat ini: ONLINE (dengan IP, uptime, device)
+      atau OFFLINE (last seen X waktu lalu)
+    ▸ Tabel histori koneksi 30 hari (dari radacct):
+      Session start | Session end | Duration | Rx | Tx | Device | Terminate cause
+
+  TAB 4 — Tagihan:
+    ▸ Tabel invoices + status (lunas/belum)
+    ▸ Tombol Generate Invoice
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 5 — HALAMAN NETWORK DEVICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5.1 devices/index.blade.php — Device Grid
+
+  FILTER BAR: [Semua ▼] [MikroTik] [Tenda] [Status: Online ▼]
+  ACTION: [+ Tambah Device] [🔄 Ping Semua]
+
+  GRID (3 kolom, responsive → 2 kolom tablet → 1 kolom mobile):
+  ┌────────────────────────────┐
+  │ 🖥️ [ICON TYPE]  [● Online] │  ← status dot + pulse jika online
+  │ MikroTik hAP RB951         │
+  │ 192.168.10.1               │
+  │ ─────────────────────────  │
+  │ CPU  [████░░░░] 45%        │  ← mini progress bar
+  │ RAM  [██████░░] 72%        │
+  │ ─────────────────────────  │
+  │ Clients: 8 connected       │
+  │ Ping: 2ms | Up: 3d 4h      │
+  │ ─────────────────────────  │
+  │ [Detail] [Ping] [Disconnect│
+  │          All Users]        │
+  └────────────────────────────┘
+
+  Warna card border kiri: hijau=online, merah=offline, kuning=degraded
+  Auto-refresh seluruh grid: 60 detik
+
+5.2 devices/show.blade.php — Detail Device (5 Section)
+
+  SECTION 1 — Device Info Header:
+    Icon tipe device + Nama + IP + Status badge
+    Sub-info: MAC, Location, RouterOS Version, Last Seen
+    Tombol: [Ping Now] [Disconnect All] [Edit] [Refresh]
+
+  SECTION 2 — Resource Gauges (auto-refresh 10 detik):
+    Tiga gauge berdampingan:
+    ┌──────────┐ ┌──────────┐ ┌──────────┐
+    │   CPU    │ │  Memory  │ │  Uptime  │
+    │ Doughnut │ │ Progress │ │ 3d 4h 2m │
+    │   45%    │ │ 512/1024 │ │          │
+    │          │ │    MB    │ │ ROS 7.x  │
+    └──────────┘ └──────────┘ └──────────┘
+    Warna gauge: hijau <60%, kuning 60-80%, merah >80%
+
+  SECTION 3 — Traffic Chart Per Interface:
+    Dropdown pilih interface: [ether1 ▼] [ether2] [bridge-pppoe]
+    Time range tabs: [1 Jam] [6 Jam] [24 Jam] [7 Hari]
+    Line chart: Rx (biru) + Tx (oranye), sumbu Y dalam Mbps
+    ▸ Data dari: GET /api/v1/devices/{id}/traffic?iface=ether1&range=24h
+    ▸ Auto-refresh tambahkan data point baru setiap 30 detik
+      (Chart.js .data.datasets[0].data.push() + .shift() untuk
+      sliding window)
+
+  SECTION 4 — Active PPPoE Sessions:
+    ┌──────────┬──────────┬──────────┬──────────┬──────┬──────┬────────┐
+    │ Username │ IP Asgn  │ Uptime   │ ↓ Mbps   │↑ Mbp │ MAC  │ Aksi  │
+    └──────────┴──────────┴──────────┴──────────┴──────┴──────┴────────┘
+    ▸ Real-time Mbps: hitung dari snapshot Redis
+    ▸ Row berwarna oranye jika usage > 90% dari rate-limit paket
+    ▸ Tombol Disconnect per row + Export CSV
+    ▸ Auto-refresh 15 detik
+
+  SECTION 5 — Alert Timeline:
+    Filter: [24 Jam ▼] [7 Hari] [30 Hari]
+    Timeline vertikal:
+    ● [CRITICAL] 13:42 — Device offline — Duration: 4 menit
+      Acknowledged by: admin @ 13:46
+    ● [WARNING]  09:15 — CPU tinggi (87%) — Auto-resolved: 09:20
+    Pagination jika > 20 item
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 6 — HALAMAN MONITORING LIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: resources/views/monitoring/live.blade.php
+
+  LAYOUT: Full-width, 3 panel
+
+  PANEL ATAS — Command Center Bar:
+  [Disconnect User: [input username] [Kirim]] 
+  [Ping Device: [dropdown] [Ping]] 
+  [Test Telegram [Kirim]]
+  ▸ Setiap aksi: loading state + success/error toast notification
+
+  PANEL TENGAH KIRI (60%) — All Active PPPoE Sessions:
+  ▸ Tabel semua session dari semua MikroTik digabung
+  ▸ Kolom tambahan: Device (asal MikroTik)
+  ▸ Filter by device (dropdown)
+  ▸ Jumlah total session di badge header
+  ▸ Auto-refresh 10 detik
+  ▸ Animasi: baris baru fade-in, baris disconnect fade-out
+
+  PANEL TENGAH KANAN (40%) — Aggregated Traffic Chart:
+  ▸ Total Rx+Tx semua device gabungan
+  ▸ Sliding window 10 menit terakhir
+  ▸ Auto-update setiap 5 detik
+
+  PANEL BAWAH — Device Status Bar:
+  ▸ Mini card per device (horizontal scroll jika banyak)
+  ▸ Nama + status dot + CPU% + Clients count
+  ▸ Klik → scroll ke bagian session filter untuk device tersebut
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 7 — HALAMAN ALERT CENTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: resources/views/alerts/index.blade.php
+
+  TABS: [🔴 Aktif (12)] [✅ Resolved] [📋 Semua]
+
+  FILTER: [Severity: Semua ▼] [Device: Semua ▼] [Tipe: Semua ▼]
+  ACTION: [Acknowledge Semua yang Dipilih] [Export CSV]
+
+  TABLE:
+  Checkbox | Severity | Device | Tipe | Pesan | Waktu | Durasi | Status | Aksi
+
+  Bulk action: select multiple → acknowledge sekaligus
+  Auto-refresh 30 detik (hanya tab Aktif)
+
+  PANEL KANAN — Telegram Configuration:
+  ┌─────────────────────────────────────┐
+  │ Konfigurasi Notifikasi Telegram     │
+  │                                     │
+  │ Bot Token: [___________________]    │
+  │ Admin Chat ID: [________________]   │
+  │ NOC Chat ID: [__________________]   │
+  │                                     │
+  │ Aktifkan notifikasi untuk:          │
+  │ [✓] Device Offline                  │
+  │ [✓] Device Online (recovery)        │
+  │ [✓] CPU > 80%                       │
+  │ [✓] PPPoE User Down                 │
+  │ [ ] Pelanggan Expired               │
+  │ [✓] Laporan Harian (07:00)         │
+  │                                     │
+  │ [Test Kirim Pesan] [Simpan]         │
+  └─────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 8 — HALAMAN LAPORAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: resources/views/reports/index.blade.php
+
+  FILTER BAR:
+  [Bulan: Januari ▼] [Tahun: 2025 ▼] [Paket: Semua ▼] [Terapkan]
+
+  SECTION 1 — Summary Cards:
+  Total Usage Bulan Ini | Top User | Paket Terpopuler | Revenue
+
+  SECTION 2 — Dua Chart Berdampingan:
+  Kiri: Bar chart usage per pelanggan (top 10)
+  Kanan: Pie chart distribusi paket internet
+
+  SECTION 3 — Tabel Detail:
+  Rank | Pelanggan | Paket | Rx GB | Tx GB | Total | Sesi
+
+  EXPORT: [📥 Export CSV] [📄 Export PDF (opsional)]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FASE 9 — UX PATTERNS YANG WAJIB KONSISTEN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Terapkan di SEMUA halaman tanpa exception:
+
+9.1 Loading States
+  ▸ Skeleton loader untuk card dan tabel saat data belum load
+    (bukan spinner — skeleton lebih profesional)
+  ▸ Button loading: disable + spinner icon saat submit form
+  ▸ Inline loading untuk auto-refresh data (jangan full page reload)
+
+9.2 Toast Notifications
+  Berikan komponen toast global (Alpine.js + Tailwind):
+  ▸ Posisi: bottom-right, stack ke atas
+  ▸ Tipe: success (hijau), error (merah), warning (kuning), info (biru)
+  ▸ Auto-dismiss: 4 detik + manual close button
+  ▸ Trigger dari mana saja:
+    window.dispatchEvent(new CustomEvent('toast', {
+      detail: { type: 'success', message: 'User berhasil diputus' }
+    }))
+
+9.3 Confirm Dialogs
+  ▸ Semua aksi destruktif (Hapus, Disconnect, Suspend) WAJIB
+    tampilkan confirm modal bukan browser confirm().
+  ▸ Confirm modal: judul merah, ikon warning, deskripsi aksi,
+    [Batal] [Ya, Lanjutkan] (tombol merah)
+
+9.4 Empty States
+  ▸ Jika tabel/grid kosong: tampilkan ilustrasi SVG sederhana
+    + pesan kontekstual + tombol aksi (misal "Tambah Pelanggan Pertama")
+  ▸ Jangan tampilkan tabel kosong tanpa penjelasan
+
+9.5 Error Handling
+  ▸ Jika API request gagal (network error, 500):
+    tampilkan error toast + retry button di section yang gagal
+  ▸ Jangan biarkan halaman blank atau error tak tertangani
+
+9.6 Responsive Breakpoints
+  ▸ Mobile (< 768px): sidebar jadi drawer, tabel horizontal scroll,
+    charts ukuran lebih kecil, grid → 1 kolom
+  ▸ Tablet (768-1024px): sidebar collapse, grid → 2 kolom
+  ▸ Desktop (> 1024px): full layout seperti desain di atas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMAT OUTPUT YANG WAJIB DIIKUTI:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▸ Mulai setiap file dengan komentar header:
+  {{-- File: resources/views/[path] --}}
+  {{-- Depends on: [list komponen/controller yang dibutuhkan] --}}
+
+▸ Pisahkan JavaScript Alpine.js ke dalam blok
+  @push('scripts') ... @endpush
+  agar tidak inline di tengah HTML.
+
+▸ Pisahkan CSS custom ke dalam blok
+  @push('styles') ... @endpush
+
+▸ Setiap Axios call harus punya:
+  - Loading state (isLoading flag)
+  - Error handling (catch block)
+  - Anti-flood (skip jika request sebelumnya belum selesai)
+
+▸ Komentar pada bagian yang tidak obvious:
+  {{-- Auto-refresh: interval 30 detik, skip if isLoading --}}
+
+▸ Urutan pengerjaan:
+  FASE 1 → FASE 2 → FASE 3 → dst.
+  Selesaikan satu FASE, tunggu konfirmasi, baru lanjut.
+  Jangan loncat-loncat fase.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MULAI DARI FASE 1:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tampilkan dulu STRUKTUR FOLDER LENGKAP (tree format) dari
+semua file yang akan dibuat, beserta daftar Controller baru
+yang perlu dibuat di app/Http/Controllers/.
+
+Setelah saya konfirmasi strukturnya benar, baru mulai
+generate kode file per file dimulai dari:
+  1. tailwind.config.js
+  2. resources/views/layouts/app.blade.php
+  3. resources/views/layouts/partials/sidebar.blade.php
+  4. resources/views/layouts/partials/topbar.blade.php
+  5. Semua komponen di resources/views/components/
