@@ -2,32 +2,68 @@
 
 namespace App\Services;
 
-use MikrotikAPI\Talker;
-use MikrotikAPI\Entity\RouterOS;
+use App\Services\RouterosAPI;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class MikroTikService
 {
-    protected $talker;
-    protected $router;
+    protected $api;
+
+    public function __construct()
+    {
+        $this->api = new RouterosAPI();
+    }
 
     public function connect()
     {
-        $host = env('MIKROTIK_HOST');
-        $user = env('MIKROTIK_USERNAME');
-        $pass = env('MIKROTIK_PASSWORD');
-        $port = env('MIKROTIK_PORT', 8728);
+        $host = config('services.mikrotik.host');
+        $user = config('services.mikrotik.user');
+        $pass = config('services.mikrotik.pass');
+        $port = (int) config('services.mikrotik.port', 8728);
 
         try {
-            $this->talker = new Talker($host, $port);
-            $this->router = new RouterOS($this->talker);
-            
-            if ($this->router->login($user, $pass)) {
+            if ($this->api->connect($host, $user, $pass)) {
                 return true;
             }
-            return false;
+            throw new Exception("Koneksi API Gagal.");
         } catch (Exception $e) {
+            Log::error("MikroTik Connection Error: " . $e->getMessage());
             return false;
+        }
+    }
+
+    public function getSystemResource()
+    {
+        try {
+            if (!$this->connect()) {
+                throw new Exception("Gagal terhubung ke MikroTik API.");
+            }
+            
+            $resource = $this->api->comm('/system/resource/print');
+            $this->api->disconnect();
+            
+            return $resource[0] ?? [];
+        } catch (Exception $e) {
+            Log::error("MikroTik getSystemResource Error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getInterfaces()
+    {
+        try {
+            if (!$this->connect()) {
+                throw new Exception("Gagal terhubung ke MikroTik API.");
+            }
+            
+            $interfaces = $this->api->comm('/interface/print');
+            $this->api->disconnect();
+            
+            return is_array($interfaces) ? $interfaces : [];
+        } catch (Exception $e) {
+            Log::error("MikroTik getInterfaces Error: " . $e->getMessage());
+            return [];
         }
     }
 
@@ -35,12 +71,35 @@ class MikroTikService
     {
         try {
             if (!$this->connect()) {
-                throw new Exception("Gagal terhubung ke MikroTik API. Periksa IP, Username, atau Password.");
+                throw new Exception("Gagal terhubung ke MikroTik API.");
             }
-            return $this->router->send("/ppp/active/print");
+            
+            $sessions = $this->api->comm('/ppp/active/print');
+            $this->api->disconnect();
+            
+            return is_array($sessions) ? $sessions : [];
         } catch (Exception $e) {
             Log::error("MikroTik getActivePppoe Error: " . $e->getMessage());
             return [];
+        }
+    }
+
+    public function disconnectUser($id)
+    {
+        try {
+            if (!$this->connect()) {
+                throw new Exception("Gagal terhubung ke MikroTik API.");
+            }
+            
+            $result = $this->api->comm('/ppp/active/remove', [
+                '.id' => $id
+            ]);
+            $this->api->disconnect();
+            
+            return true;
+        } catch (Exception $e) {
+            Log::error("MikroTik disconnectUser Error: " . $e->getMessage());
+            return false;
         }
     }
 

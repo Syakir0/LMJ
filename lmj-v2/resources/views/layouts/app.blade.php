@@ -167,6 +167,89 @@
         </div>
     </div>
 
+    <!-- Notification Popup -->
+    <div id="web-notifier" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
+    
+    <audio id="notif-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <script>
+        let lastNotifId = {{ \App\Models\Alert::max('id') ?? 0 }};
+        console.log('Notification system initialized. Last ID:', lastNotifId);
+
+        function checkWebNotifications() {
+            fetch('{{ route('alerts.latest') }}?last_id=' + lastNotifId)
+                .then(response => response.json())
+                .then(alerts => {
+                    if (alerts.length > 0) {
+                        const sound = document.getElementById('notif-sound');
+                        
+                        alerts.forEach(alert => {
+                            console.log('New notification received:', alert.title);
+                            showToast(alert);
+                            if (alert.id > lastNotifId) {
+                                lastNotifId = alert.id;
+                            }
+                        });
+                        
+                        // Play sound once if there are new alerts
+                        if(sound) sound.play().catch(e => console.log('Autoplay blocked'));
+                    }
+                })
+                .catch(err => console.error('Notification error:', err));
+        }
+
+        function showToast(alert) {
+            const container = document.getElementById('web-notifier');
+            const toast = document.createElement('div');
+            const color = alert.level === 'critical' ? '#e74c3c' : '#3498db';
+            const icon = alert.level === 'critical' ? 'fa-exclamation-triangle' : 'fa-check-circle';
+            
+            toast.style.cssText = `
+                background: white;
+                border-left: 6px solid ${color};
+                padding: 18px 25px;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                min-width: 320px;
+                margin-top: 10px;
+                opacity: 0;
+                transform: translateY(20px);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            `;
+
+            toast.innerHTML = `
+                <div style="background: ${color}; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas ${icon}" style="font-size: 1.2rem;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 800; color: #1a1a1a; font-size: 0.95rem; margin-bottom: 3px;">${alert.title}</div>
+                    <div style="font-size: 0.85rem; color: #555; line-height: 1.4;">${alert.message}</div>
+                </div>
+                <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#ccc; cursor:pointer; font-size:1.2rem;">&times;</button>
+            `;
+
+            container.appendChild(toast);
+            
+            // Trigger Animation
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 100);
+            
+            // Auto-remove
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(50px)';
+                setTimeout(() => toast.remove(), 500);
+            }, 10000);
+        }
+
+        setInterval(checkWebNotifications, 3000);
+    </script>
+
     @yield('scripts')
 </body>
 </html>

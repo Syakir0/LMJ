@@ -31,4 +31,11 @@ return [
         ],
     ],
 
+    'mikrotik' => [
+        'host' => env('MIKROTIK_HOST', '192.168.10.1'),
+        'user' => env('MIKROTIK_USERNAME', 'admin'),
+        'pass' => env('MIKROTIK_PASSWORD', ''),
+        'port' => env('MIKROTIK_PORT', 8728),
+    ],
+
 ];

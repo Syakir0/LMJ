@@ -25,7 +25,11 @@
             <tbody>
                 @forelse($devices as $device)
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 12px; font-weight: 500;">{{ $device->name }}</td>
+                    <td style="padding: 12px; font-weight: 500;">
+                        <a href="{{ route('devices.show', $device) }}" style="text-decoration: none; color: inherit;">
+                            {{ $device->name }} <i class="fas fa-external-link-alt" style="font-size: 0.7rem; color: #bdc3c7; margin-left: 5px;"></i>
+                        </a>
+                    </td>
                     <td style="padding: 12px;"><code>{{ $device->ip_address }}</code></td>
                     <td style="padding: 12px;">{{ strtoupper($device->type) }}</td>
                     <td style="padding: 12px; text-align: center;">

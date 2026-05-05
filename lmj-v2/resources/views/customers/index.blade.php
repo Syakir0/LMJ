@@ -7,9 +7,14 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="margin: 0; font-size: 1.2rem;"><i class="fas fa-users"></i> Manajemen Pelanggan PPPoE</h2>
-        <a href="{{ route('customers.create') }}" class="btn btn-primary" style="text-decoration: none;">
-            <i class="fas fa-plus"></i> Tambah Pelanggan
-        </a>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ route('reports.customers') }}" class="btn" style="background: #27ae60; color: white; text-decoration: none;">
+                <i class="fas fa-file-csv"></i> Backup Report
+            </a>
+            <a href="{{ route('customers.create') }}" class="btn btn-primary" style="text-decoration: none;">
+                <i class="fas fa-plus"></i> Tambah Pelanggan
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
