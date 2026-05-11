@@ -16,22 +16,30 @@ class ReportController extends Controller
         $csv = Writer::createFromFileObject(new SplTempFileObject());
         
         // Add Header
-        $csv->insertOne(['ID', 'Nama', 'Username', 'IP PPPoE', 'Paket', 'Status', 'Tanggal Daftar']);
+        $csv->insertOne([
+            'ID', 'Nama', 'Username', 'Paket', 'Harga', 
+            'Tgl Tagihan', 'Jatuh Tempo', 'Status Pembayaran', 
+            'Status Akun', 'Phone', 'Telegram ID'
+        ]);
         
         // Add Data
-        foreach ($customers as $customer) {
+        foreach ($customers as $c) {
             $csv->insertOne([
-                $customer->id,
-                $customer->name,
-                $customer->username,
-                $customer->pppoe_ip ?? '-',
-                $customer->package->name ?? '-',
-                strtoupper($customer->status),
-                $customer->created_at->toDateTimeString(),
+                $c->id,
+                $c->name,
+                $c->username,
+                $c->package->name ?? '-',
+                $c->package->price ?? 0,
+                $c->billing_date,
+                $c->due_date ? \Carbon\Carbon::parse($c->due_date)->format('Y-m-d') : '-',
+                strtoupper($c->payment_status),
+                strtoupper($c->status),
+                $c->phone,
+                $c->telegram_chat_id
             ]);
         }
         
-        $filename = 'laporan_pelanggan_' . date('Y-m-d') . '.csv';
+        $filename = 'daftar_pelanggan_' . date('Y-m-d') . '.csv';
         
         return response((string) $csv)
             ->header('Content-Type', 'text/csv')

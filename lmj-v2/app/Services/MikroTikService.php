@@ -84,6 +84,45 @@ class MikroTikService
         }
     }
 
+    public function getNeighbors()
+    {
+        try {
+            if (!$this->connect()) return [];
+            $neighbors = $this->api->comm('/ip/neighbor/print');
+            $this->api->disconnect();
+            return is_array($neighbors) ? $neighbors : [];
+        } catch (Exception $e) {
+            Log::error("MikroTik getNeighbors Error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getDhcpLeases()
+    {
+        try {
+            if (!$this->connect()) return [];
+            $leases = $this->api->comm('/ip/dhcp-server/lease/print');
+            $this->api->disconnect();
+            return is_array($leases) ? $leases : [];
+        } catch (Exception $e) {
+            Log::error("MikroTik getDhcpLeases Error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getArpTable()
+    {
+        try {
+            if (!$this->connect()) return [];
+            $arp = $this->api->comm('/ip/arp/print');
+            $this->api->disconnect();
+            return is_array($arp) ? $arp : [];
+        } catch (Exception $e) {
+            Log::error("MikroTik getArpTable Error: " . $e->getMessage());
+            return [];
+        }
+    }
+
     public function disconnectUser($id)
     {
         try {

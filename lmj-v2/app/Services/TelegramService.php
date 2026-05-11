@@ -86,14 +86,55 @@ class TelegramService
         if (isset($update['message'])) {
             $message = $update['message'];
             $chatId = $message['chat']['id'];
+            $text = $message['text'] ?? '';
 
-            if (isset($message['text']) && $message['text'] === '/start') {
+            if ($text === '/start') {
                 return $this->sendWelcomeMessage($chatId);
+            } elseif ($text === '/status') {
+                return $this->handleStatusCheck($chatId);
+            } elseif ($text === '/bantuan' || $text === '/help') {
+                return $this->sendHelpMessage($chatId);
             } elseif (isset($message['contact'])) {
                 return $this->handleContact($chatId, $message['contact']);
             }
         }
         return false;
+    }
+
+    protected function handleStatusCheck($chatId)
+    {
+        $customer = \App\Models\Customer::where('telegram_chat_id', $chatId)->first();
+
+        if (!$customer) {
+            return $this->sendMessage($chatId, "❌ *Maaf!*\n\nAkun Anda belum terdaftar. Silakan klik /start dan bagikan nomor HP Anda untuk mendaftar.");
+        }
+
+        $statusEmoji = $customer->status === 'active' ? '✅' : '🚫';
+        $paymentEmoji = $customer->payment_status === 'paid' ? '💰' : '⚠️';
+        
+        $dueDate = $customer->due_date ? \Carbon\Carbon::parse($customer->due_date)->format('d M Y') : '-';
+
+        $msg = "📋 *INFO LAYANAN ANDA*\n\n"
+             . "👤 Nama: *{$customer->name}*\n"
+             . "📦 Paket: {$customer->package->name}\n"
+             . "Status: {$statusEmoji} " . strtoupper($customer->status) . "\n\n"
+             . "💳 *STATUS TAGIHAN*\n"
+             . "Pembayaran: {$paymentEmoji} " . strtoupper($customer->payment_status) . "\n"
+             . "Jatuh Tempo: " . $dueDate . "\n\n"
+             . "_Gunakan /bantuan untuk perintah lainnya._";
+
+        return $this->sendMessage($chatId, $msg);
+    }
+
+    protected function sendHelpMessage($chatId)
+    {
+        $text = "🛠️ *BANTUAN BOT LAYANAN*\n\n"
+              . "Berikut adalah perintah yang bisa Anda gunakan:\n\n"
+              . "📱 /start - Daftar/Hubungkan akun\n"
+              . "📋 /status - Cek status langganan & tagihan\n"
+              . "❓ /bantuan - Tampilkan pesan ini";
+        
+        return $this->sendMessage($chatId, $text);
     }
 
     protected function sendWelcomeMessage($chatId)

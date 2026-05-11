@@ -272,6 +272,7 @@
                         if(card) {
                             const isRunning = iface.running === 'true';
                             card.style.background = isRunning ? '#f0fff4' : '#fff5f5';
+                            card.style.borderColor = isRunning ? '#c6f6d5' : '#fed7d7';
                             card.querySelector('.indicator').style.background = isRunning ? '#2ecc71' : '#e74c3c';
                             card.querySelector('.status-text').innerText = isRunning ? 'Connected' : 'Disconnected';
                         }
@@ -344,29 +345,12 @@
             });
     }
 
-    function checkWebNotifications() {
-        fetch('{{ route('alerts.latest') }}?last_id=' + lastNotifId)
-            .then(response => response.json())
-            .then(alerts => {
-                if (alerts.length > 0) {
-                    const sound = document.getElementById('notif-sound');
-                    if(sound) sound.play().catch(e => console.log('Autoplay blocked'));
-
-                    alerts.forEach(alert => {
-                        showToast(alert);
-                        lastNotifId = Math.max(lastNotifId, alert.id);
-                    });
-                }
-            });
-    }
-
     // Initialize Automation
     document.addEventListener('DOMContentLoaded', function() {
         fetchDashboardData();
         // Update stats & sessions every 5 seconds
         setInterval(fetchDashboardData, 5000);
-        // Check alerts every 5 seconds
-        setInterval(checkWebNotifications, 5000);
+        // Check alerts is handled globally in app.blade.php
     });
 </script>
 @endsection

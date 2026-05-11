@@ -9,18 +9,6 @@
         <h2 style="margin: 0; font-size: 1.2rem;"><i class="fas fa-file-invoice-dollar"></i> Manajemen Tagihan Pelanggan</h2>
     </div>
 
-    @if(session('success'))
-        <div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
-            <i class="fas fa-check-circle"></i> {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
-            <i class="fas fa-exclamation-triangle"></i> {{ session('error') }}
-        </div>
-    @endif
-
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
             <thead>
@@ -58,9 +46,9 @@
                     </td>
                     <td style="padding: 12px; text-align: center;">
                         @if($invoice->status !== 'paid')
-                        <form action="{{ route('invoices.pay', $invoice) }}" method="POST" style="display: inline;" onsubmit="return confirm('Konfirmasi pembayaran tunai untuk invoice ini?')">
+                        <form action="{{ route('invoices.pay', $invoice) }}" method="POST" style="display: inline;">
                             @csrf
-                            <button type="submit" class="btn" style="background: #27ae60; color: white; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer;">
+                            <button type="submit" class="btn" style="background: #27ae60; color: white; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer;" onclick="confirmAction(event, 'Konfirmasi Pembayaran', 'Konfirmasi pembayaran tunai untuk invoice ini?')">
                                 <i class="fas fa-check"></i> Bayar
                             </button>
                         </form>

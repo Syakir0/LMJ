@@ -47,30 +47,30 @@
 </style>
 <script>
     function testTelegram() {
-        if (!confirm('Kirim pesan tes ke Telegram?')) return;
-        
-        const btn = event.target;
-        const originalText = btn.innerText;
-        btn.disabled = true;
-        btn.innerText = 'Mengirim...';
+        showConfirm('Konfirmasi', 'Kirim pesan tes ke Telegram?', () => {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Mengirim...';
 
-        fetch("{{ route('settings.test-telegram') }}", {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            alert(data.message);
-        })
-        .catch(error => {
-            alert('Terjadi kesalahan saat mencoba mengirim pesan.');
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerText = originalText;
+            fetch("{{ route('settings.test-telegram') }}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert('Informasi', data.message, data.success ? 'success' : 'error');
+            })
+            .catch(error => {
+                showAlert('Kesalahan', 'Terjadi kesalahan saat mencoba mengirim pesan.', 'error');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            });
         });
     }
 </script>

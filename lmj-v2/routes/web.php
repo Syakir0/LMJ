@@ -22,7 +22,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/devices-list', [NetworkDeviceController::class, 'list'])->name('devices.list');
     Route::resource('customers', CustomerController::class);
     Route::resource('packages', PackageController::class);
+    // Network Devices & Discovery
     Route::resource('devices', NetworkDeviceController::class);
+    Route::get('/discovery', [\App\Http\Controllers\DiscoveryController::class, 'index'])->name('discovery.index');
+    Route::post('/discovery/add', [\App\Http\Controllers\DiscoveryController::class, 'addToDevices'])->name('discovery.add');
     Route::resource('alerts', AlertController::class);
     Route::get('/alerts-latest', [AlertController::class, 'latest'])->name('alerts.latest');
     Route::get('/reports/customers', [ReportController::class, 'customers'])->name('reports.customers');
@@ -30,6 +33,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/invoices/{invoice}/pay', [InvoiceController::class, 'markAsPaid'])->name('invoices.pay');
     Route::post('/settings', [SystemSettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/test-telegram', [SystemSettingController::class, 'testTelegram'])->name('settings.test-telegram');
+
+    // Telegram Broadcast
+    Route::get('/telegram/broadcast', [\App\Http\Controllers\TelegramBroadcastController::class, 'index'])->name('telegram.broadcast');
+    Route::post('/telegram/broadcast', [\App\Http\Controllers\TelegramBroadcastController::class, 'send'])->name('telegram.broadcast.send');
 });
 
 Route::middleware('auth')->group(function () {

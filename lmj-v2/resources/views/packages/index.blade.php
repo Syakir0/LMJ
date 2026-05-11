@@ -12,12 +12,6 @@
         </a>
     </div>
 
-    @if(session('success'))
-        <div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
-            <i class="fas fa-check-circle"></i> {{ session('success') }}
-        </div>
-    @endif
-
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
             <thead>
@@ -38,10 +32,10 @@
                         <a href="{{ route('packages.edit', $package) }}" style="color: var(--accent-color); margin-right: 10px; text-decoration: none;">
                             <i class="fas fa-edit"></i>
                         </a>
-                        <form action="{{ route('packages.destroy', $package) }}" method="POST" style="display: inline;" onsubmit="return confirm('Hapus paket ini?')">
+                        <form action="{{ route('packages.destroy', $package) }}" method="POST" style="display: inline;">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" style="background: none; border: none; color: #e74c3c; cursor: pointer;">
+                            <button type="submit" style="background: none; border: none; color: #e74c3c; cursor: pointer;" onclick="confirmDelete(event)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>

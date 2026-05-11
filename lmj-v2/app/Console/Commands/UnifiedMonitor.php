@@ -24,6 +24,7 @@ class UnifiedMonitor extends Command
         $lastBillingDate = Cache::get('last_billing_run_date');
         $lastOverdueCheck = Cache::get('last_overdue_check_time', 0);
         $lastTelegramPoll = 0;
+        $lastDiscoveryCheck = 0;
 
         // Ensure we don't run overdue check immediately on restart if it was run recently
         // This prevents spamming on every restart.
@@ -84,11 +85,51 @@ class UnifiedMonitor extends Command
                     $lastTelegramPoll = time();
                 }
 
+                // 0.1 Device Discovery Radar (Every 5 minutes)
+                if (time() - $lastDiscoveryCheck > 300) {
+                    $this->info('Running device discovery radar...');
+                    $arpTable = $mt->getArpTable();
+                    $knownIps = NetworkDevice::pluck('ip_address')->toArray();
+                    
+                    foreach ($arpTable as $entry) {
+                        $ip = $entry['address'] ?? '';
+                        $mac = $entry['mac-address'] ?? '';
+                        $iface = $entry['interface'] ?? '';
+                        
+                        // Skip if IP is known or it's a gateway (.1)
+                        if (in_array($ip, $knownIps) || str_ends_with($ip, '.1') || empty($mac)) {
+                            continue;
+                        }
+
+                        // Check if we already alerted about this MAC recently to avoid spam
+                        $cacheKey = "alerted_mac_" . str_replace(':', '', $mac);
+                        if (!Cache::has($cacheKey)) {
+                            $msg = "🕵️‍♂️ *RADAR: PERANGKAT BARU*\n\n"
+                                 . "Ditemukan alat belum terdaftar di jaringan:\n"
+                                 . "📍 IP: `{$ip}`\n"
+                                 . "🆔 MAC: `{$mac}`\n"
+                                 . "🔌 Port: `{$iface}`\n\n"
+                                 . "Silakan cek menu *Discovery Perangkat* untuk memantau alat ini.";
+                            
+                            $tg->sendToNoc($msg);
+                            $this->warn("New device detected: $ip ($mac)");
+                            
+                            // Remember this device for 24 hours so we don't spam
+                            Cache::put($cacheKey, true, now()->addDay());
+                        }
+                    }
+                    $lastDiscoveryCheck = time();
+                }
+
                 // 1. Periodic Billing Tasks
                 // Generate Invoices once a day
                 if ($lastBillingDate !== $now->toDateString()) {
                     $this->info('Running daily billing generation...');
                     Artisan::call('billing:generate');
+                    
+                    $this->info('Running daily billing reminders...');
+                    Artisan::call('billing:send-reminders');
+                    
                     $lastBillingDate = $now->toDateString();
                     Cache::forever('last_billing_run_date', $lastBillingDate);
                 }

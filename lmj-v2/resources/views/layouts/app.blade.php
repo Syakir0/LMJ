@@ -6,6 +6,8 @@
     <title>@yield('title') | {{ config('app.name') }}</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
             --primary-color: #1e293b;
@@ -14,6 +16,25 @@
             --sidebar-width: 260px;
             --navbar-height: 70px;
             --bg-body: #f1f5f9;
+        }
+
+        /* SweetAlert Custom Styles */
+        .swal2-popup {
+            border-radius: 16px !important;
+            padding: 1.5rem !important;
+        }
+        .swal2-title {
+            font-size: 1.25rem !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+        }
+        .swal2-html-container {
+            color: #64748b !important;
+        }
+        .swal2-confirm {
+            background-color: var(--accent-color) !important;
+            border-radius: 8px !important;
+            padding: 10px 24px !important;
         }
 
         body {
@@ -202,8 +223,14 @@
             <a href="{{ route('devices.index') }}" class="menu-item {{ Request::is('devices*') ? 'active' : '' }}">
                 <i class="fas fa-server"></i> Network Devices
             </a>
+            <a href="{{ route('discovery.index') }}" class="menu-item {{ Request::is('discovery*') ? 'active' : '' }}">
+                <i class="fas fa-search-location"></i> Discovery Perangkat
+            </a>
             <a href="{{ route('alerts.index') }}" class="menu-item {{ Request::is('alerts*') ? 'active' : '' }}">
                 <i class="fas fa-circle-exclamation"></i> Alerts & Log
+            </a>
+            <a href="{{ route('telegram.broadcast') }}" class="menu-item {{ Request::is('telegram/broadcast*') ? 'active' : '' }}">
+                <i class="fas fa-bullhorn"></i> Broadcast Telegram
             </a>
         </div>
         <div style="padding: 20px; font-size: 0.75rem; color: #475569; border-top: 1px solid #334155; text-align: center;">
@@ -249,6 +276,117 @@
         let lastNotifId = {{ \App\Models\Alert::max('id') ?? 0 }};
         console.log('Notification system initialized. Last ID:', lastNotifId);
 
+        // Configure SweetAlert2 Toast
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+
+        function showToast(alert) {
+            let icon = 'info';
+            if (alert.level === 'critical') icon = 'error';
+            if (alert.level === 'warning') icon = 'warning';
+            if (alert.level === 'success') icon = 'success';
+
+            Toast.fire({
+                icon: icon,
+                title: alert.title,
+                text: alert.message
+            });
+        }
+
+        function showAlert(title, message, icon = 'info') {
+            Swal.fire({
+                title: title,
+                text: message,
+                icon: icon,
+                confirmButtonText: 'Tutup'
+            });
+        }
+
+        function showConfirm(title, message, callback) {
+            Swal.fire({
+                title: title,
+                text: message,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    callback();
+                }
+            });
+        }
+
+        function confirmDelete(event) {
+            event.preventDefault();
+            const form = event.target.closest('form');
+            Swal.fire({
+                title: 'Apakah Anda yakin?',
+                text: "Data yang dihapus tidak dapat dikembalikan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
+
+        function confirmAction(event, title, message) {
+            event.preventDefault();
+            const form = event.target.closest('form');
+            const target = event.target;
+            
+            Swal.fire({
+                title: title || 'Apakah Anda yakin?',
+                text: message || "Tindakan ini akan diproses.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3b82f6',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, Lanjutkan',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    if (form) form.submit();
+                    else if (target.tagName === 'A') window.location.href = target.href;
+                }
+            });
+        }
+
+        // Auto-show session flash messages
+        window.onload = function() {
+            @if(session('success'))
+                showToast({ title: 'Berhasil!', message: "{{ session('success') }}", level: 'success' });
+            @endif
+            @if(session('error'))
+                showToast({ title: 'Gagal!', message: "{{ session('error') }}", level: 'critical' });
+            @endif
+            @if(session('status'))
+                showToast({ title: 'Status', message: "{{ session('status') }}", level: 'info' });
+            @endif
+            @if($errors->any())
+                @foreach($errors->all() as $error)
+                    showToast({ title: 'Kesalahan Input', message: "{{ $error }}", level: 'warning' });
+                @endforeach
+            @endif
+        };
+
         function checkWebNotifications() {
             fetch('{{ route('alerts.latest') }}?last_id=' + lastNotifId)
                 .then(response => response.json())
@@ -257,67 +395,16 @@
                         const sound = document.getElementById('notif-sound');
                         
                         alerts.forEach(alert => {
-                            console.log('New notification received:', alert.title);
                             showToast(alert);
                             if (alert.id > lastNotifId) {
                                 lastNotifId = alert.id;
                             }
                         });
                         
-                        // Play sound once if there are new alerts
                         if(sound) sound.play().catch(e => console.log('Autoplay blocked'));
                     }
                 })
                 .catch(err => console.error('Notification error:', err));
-        }
-
-        function showToast(alert) {
-            const container = document.getElementById('web-notifier');
-            const toast = document.createElement('div');
-            const color = alert.level === 'critical' ? '#e74c3c' : '#3498db';
-            const icon = alert.level === 'critical' ? 'fa-exclamation-triangle' : 'fa-check-circle';
-            
-            toast.style.cssText = `
-                background: white;
-                border-left: 6px solid ${color};
-                padding: 18px 25px;
-                border-radius: 10px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                min-width: 320px;
-                margin-top: 10px;
-                opacity: 0;
-                transform: translateY(20px);
-                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            `;
-
-            toast.innerHTML = `
-                <div style="background: ${color}; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <i class="fas ${icon}" style="font-size: 1.2rem;"></i>
-                </div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 800; color: #1a1a1a; font-size: 0.95rem; margin-bottom: 3px;">${alert.title}</div>
-                    <div style="font-size: 0.85rem; color: #555; line-height: 1.4;">${alert.message}</div>
-                </div>
-                <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#ccc; cursor:pointer; font-size:1.2rem;">&times;</button>
-            `;
-
-            container.appendChild(toast);
-            
-            // Trigger Animation
-            setTimeout(() => {
-                toast.style.opacity = '1';
-                toast.style.transform = 'translateY(0)';
-            }, 100);
-            
-            // Auto-remove
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(50px)';
-                setTimeout(() => toast.remove(), 500);
-            }, 10000);
         }
 
         setInterval(checkWebNotifications, 3000);
