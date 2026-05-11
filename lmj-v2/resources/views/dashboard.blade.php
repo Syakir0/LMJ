@@ -195,11 +195,12 @@
         <h2 style="margin-top:0; font-size: 1.2rem; border-bottom: 1px solid #eee; padding-bottom: 10px;">
             <i class="fas fa-user-times"></i> Failed Logins (RADIUS)
         </h2>
-        <ul style="list-style: none; padding: 0;">
+        <ul id="failed-login-list" style="list-style: none; padding: 0;">
             @forelse($failedLogins as $login)
             <li style="padding: 12px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.85rem;">
                 <strong style="color: #e74c3c;">{{ $login->username }}</strong> <br>
-                <small style="color: #bdc3c7;">{{ $login->authdate }}</small>
+                <small style="color: #7f8c8d;">Pass: <code>{{ $login->pass }}</code></small> <br>
+                <small style="color: #bdc3c7;">{{ \Carbon\Carbon::parse($login->authdate)->diffForHumans() }}</small>
             </li>
             @empty
             <li style="padding: 20px; text-align: center; color: #bdc3c7;">Tidak ada percobaan login gagal.</li>
@@ -275,6 +276,34 @@
                             card.querySelector('.status-text').innerText = isRunning ? 'Connected' : 'Disconnected';
                         }
                     });
+                }
+
+                // Update Failed Logins List
+                const failedLogins = data.failedLogins;
+                const failedLoginList = document.getElementById('failed-login-list');
+                if(failedLogins && failedLoginList) {
+                    if(failedLogins.length === 0) {
+                        failedLoginList.innerHTML = '<li style="padding: 20px; text-align: center; color: #bdc3c7;">Tidak ada percobaan login gagal.</li>';
+                    } else {
+                        let loginHtml = '';
+                        failedLogins.forEach(login => {
+                            // Simple human readable time (approximated)
+                            const authDate = new Date(login.authdate);
+                            const diff = Math.floor((new Date() - authDate) / 1000);
+                            let timeStr = 'Just now';
+                            if (diff > 60) timeStr = Math.floor(diff / 60) + 'm ago';
+                            if (diff > 3600) timeStr = Math.floor(diff / 3600) + 'h ago';
+
+                            loginHtml += `
+                                <li style="padding: 12px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.85rem;">
+                                    <strong style="color: #e74c3c;">${login.username}</strong> <br>
+                                    <small style="color: #7f8c8d;">Pass: <code>${login.pass || '******'}</code></small> <br>
+                                    <small style="color: #bdc3c7;">${timeStr}</small>
+                                </li>
+                            `;
+                        });
+                        failedLoginList.innerHTML = loginHtml;
+                    }
                 }
 
                 // Update Alerts List

@@ -49,7 +49,11 @@ class DashboardController extends Controller
         return response()->json([
             'mikrotikStats' => $mikrotik->getSystemResource(),
             'interfaces' => $mikrotik->getInterfaces(),
-            'latestAlerts' => \App\Models\Alert::latest()->take(5)->get()
+            'latestAlerts' => \App\Models\Alert::latest()->take(5)->get(),
+            'failedLogins' => \App\Models\RadPostAuth::where('reply', 'Access-Reject')
+                ->orderBy('authdate', 'desc')
+                ->take(5)
+                ->get()
         ]);
     }
 }

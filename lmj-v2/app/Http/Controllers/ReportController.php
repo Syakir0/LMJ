@@ -31,7 +31,10 @@ class ReportController extends Controller
             ]);
         }
         
-        $csv->output('laporan_pelanggan_' . date('Y-m-d') . '.csv');
-        exit;
+        $filename = 'laporan_pelanggan_' . date('Y-m-d') . '.csv';
+        
+        return response((string) $csv)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 }

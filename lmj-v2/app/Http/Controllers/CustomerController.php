@@ -10,7 +10,7 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        $customers = Customer::with('package')->get();
+        $customers = Customer::with(['package', 'device'])->get();
         return view('customers.index', compact('customers'));
     }
 
@@ -27,7 +27,12 @@ class CustomerController extends Controller
             'username' => 'required|string|unique:customers,username',
             'password' => 'required|string|min:6',
             'package_id' => 'required|exists:packages,id',
+            'billing_date' => 'required|integer|min:1|max:31',
+            'due_date' => 'nullable|date',
+            'payment_status' => 'required|in:paid,unpaid,isolated',
             'telegram_id' => 'nullable|string',
+            'phone' => 'required|string',
+            'telegram_chat_id' => 'nullable|string',
         ]);
 
         Customer::create($validated);
@@ -48,7 +53,12 @@ class CustomerController extends Controller
             'username' => 'required|string|unique:customers,username,' . $customer->id,
             'password' => 'nullable|string|min:6',
             'package_id' => 'required|exists:packages,id',
+            'billing_date' => 'required|integer|min:1|max:31',
+            'due_date' => 'nullable|date',
+            'payment_status' => 'required|in:paid,unpaid,isolated',
             'telegram_id' => 'nullable|string',
+            'phone' => 'required|string',
+            'telegram_chat_id' => 'nullable|string',
             'status' => 'required|in:active,non-active,suspended',
         ]);
 

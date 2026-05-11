@@ -7,6 +7,8 @@ use App\Http\Controllers\NetworkDeviceController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -17,19 +19,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard-stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
     Route::get('/pppoe-active', [DashboardController::class, 'pppoeActive'])->name('pppoe.active');
+    Route::get('/devices-list', [NetworkDeviceController::class, 'list'])->name('devices.list');
     Route::resource('customers', CustomerController::class);
     Route::resource('packages', PackageController::class);
     Route::resource('devices', NetworkDeviceController::class);
     Route::resource('alerts', AlertController::class);
     Route::get('/alerts-latest', [AlertController::class, 'latest'])->name('alerts.latest');
     Route::get('/reports/customers', [ReportController::class, 'customers'])->name('reports.customers');
+    Route::resource('invoices', InvoiceController::class);
+    Route::post('/invoices/{invoice}/pay', [InvoiceController::class, 'markAsPaid'])->name('invoices.pay');
     Route::post('/settings', [SystemSettingController::class, 'update'])->name('settings.update');
+    Route::post('/settings/test-telegram', [SystemSettingController::class, 'testTelegram'])->name('settings.test-telegram');
 });
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+Route::post('/telegram/webhook', [\App\Http\Controllers\TelegramController::class, 'webhook'])->name('telegram.webhook');
+
+Route::get('/telegram/set-webhook', function () {
+    $token = \App\Models\SystemSetting::where('key', 'telegram_bot_token')->first()->value;
+    $url = url('/telegram/webhook');
+    
+    // Check if we are on localhost, if so, we might need ngrok
+    if (str_contains($url, '127.0.0.1') || str_contains($url, 'localhost')) {
+        return "Error: Webhook tidak bisa diset ke localhost. Gunakan ngrok dan buka URL ngrok tersebut /telegram/set-webhook";
+    }
+
+    $response = file_get_contents("https://api.telegram.org/bot$token/setWebhook?url=$url");
+    return $response;
 });
 
 require __DIR__.'/auth.php';

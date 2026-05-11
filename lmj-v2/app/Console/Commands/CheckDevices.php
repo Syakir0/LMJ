@@ -10,51 +10,71 @@ use App\Services\TelegramService;
 
 class CheckDevices extends Command
 {
-    protected $signature = 'device:check-all';
-    protected $description = 'Monitor all network devices status via Ping';
+    protected $signature = 'device:check-all {--loop}';
+    protected $description = 'Monitor all network devices status via Ping & PPPoE fallback';
 
     public function handle(MikroTikService $mt, TelegramService $tg)
     {
-        $devices = NetworkDevice::all();
+        $this->info('Monitoring Perangkat dimulai...');
+        $loop = $this->option('loop');
 
-        foreach ($devices as $device) {
-            $isOnline = $mt->ping($device->ip_address);
-            $oldStatus = $device->is_online;
+        do {
+            $devices = NetworkDevice::all();
+            $pppoeSessions = $mt->getActivePppoe();
+            $activeIps = array_column($pppoeSessions, 'address');
 
-            $device->update([
-                'is_online' => $isOnline,
-                'last_seen' => $isOnline ? now() : $device->last_seen
-            ]);
+            foreach ($devices as $device) {
+                $isOnline = false;
+                $newIp = $device->ip_address;
 
-            // Jika status berubah dari online ke offline
-            if ($oldStatus && !$isOnline) {
-                $message = "🔴 *DEVICE DOWN*\nName: {$device->name}\nIP: {$device->ip_address}\nTime: " . now();
-                
-                Alert::create([
-                    'device_id' => $device->id,
-                    'title' => 'Device Down',
-                    'message' => $message,
-                    'severity' => 'critical'
-                ]);
+                // 1. Cek via Username PPPoE (Prioritas utama)
+                if ($device->username) {
+                    foreach ($pppoeSessions as $session) {
+                        if (($session['user'] ?? $session['name'] ?? '') === $device->username) {
+                            $isOnline = true;
+                            $newIp = $session['address'] ?? $newIp;
+                            break;
+                        }
+                    }
+                }
 
-                $tg->sendToNoc($message);
-                $this->error("Device {$device->name} is DOWN!");
+                // 2. Cek via ICMP Ping (Jika belum online atau tidak ada username)
+                if (!$isOnline) {
+                    $isOnline = $mt->ping($device->ip_address);
+                    
+                    // 3. Cek via IP di PPPoE Active (Jika ping gagal)
+                    if (!$isOnline && in_array($device->ip_address, $activeIps)) {
+                        $isOnline = true;
+                    }
+                }
+
+                $oldStatus = $device->is_online;
+
+                if ($oldStatus != $isOnline || $device->ip_address != $newIp) {
+                    $device->update([
+                        'is_online' => $isOnline,
+                        'ip_address' => $newIp,
+                        'last_seen' => $isOnline ? now() : $device->last_seen
+                    ]);
+
+                    $message = $isOnline 
+                        ? "🟢 *DEVICE UP*\nName: {$device->name}\nIP: {$device->ip_address}"
+                        : "🔴 *DEVICE DOWN*\nName: {$device->name}\nIP: {$device->ip_address}";
+
+                    \App\Models\Alert::create([
+                        'device_id' => $device->id,
+                        'title' => $isOnline ? 'Device Up' : 'Device Down',
+                        'message' => $message,
+                        'level' => $isOnline ? 'info' : 'critical'
+                    ]);
+
+                    $this->info($isOnline ? "UP: {$device->name}" : "DOWN: {$device->name}");
+                }
             }
 
-            // Jika status berubah dari offline ke online
-            if (!$oldStatus && $isOnline) {
-                $message = "🟢 *DEVICE UP*\nName: {$device->name}\nIP: {$device->ip_address}\nTime: " . now();
-                
-                Alert::create([
-                    'device_id' => $device->id,
-                    'title' => 'Device Up',
-                    'message' => $message,
-                    'severity' => 'info'
-                ]);
-
-                $tg->sendToNoc($message);
-                $this->info("Device {$device->name} is UP!");
+            if ($loop) {
+                sleep(10); // Tunggu 10 detik
             }
-        }
+        } while ($loop);
     }
 }

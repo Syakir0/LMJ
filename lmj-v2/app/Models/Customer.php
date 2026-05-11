@@ -12,13 +12,28 @@ class Customer extends Model
         'password',
         'pppoe_ip',
         'package_id',
+        'billing_date',
+        'due_date',
+        'payment_status',
         'telegram_id',
+        'phone',
+        'telegram_chat_id',
         'status',
     ];
 
     public function package()
     {
         return $this->belongsTo(Package::class);
+    }
+
+    public function device()
+    {
+        return $this->hasOne(NetworkDevice::class, 'username', 'username');
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function alerts()

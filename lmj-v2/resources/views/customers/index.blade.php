@@ -30,25 +30,62 @@
                     <th style="padding: 12px;">Nama</th>
                     <th style="padding: 12px;">Username</th>
                     <th style="padding: 12px;">Paket</th>
+                    <th style="padding: 12px;">Tgl Tagihan</th>
+                    <th style="padding: 12px;">Jatuh Tempo</th>
                     <th style="padding: 12px;">Status</th>
-                    <th style="padding: 12px;">Dibuat</th>
                     <th style="padding: 12px; text-align: center;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($customers as $customer)
-                <tr style="border-bottom: 1px solid #eee;">
+                @php
+                    $isOverdue = $customer->due_date && \Carbon\Carbon::parse($customer->due_date)->isPast() && $customer->payment_status == 'unpaid';
+                    $isIsolated = $customer->payment_status == 'isolated';
+                    $rowBg = $isIsolated ? '#ffebee' : ($isOverdue ? '#fff9c4' : 'transparent');
+                @endphp
+                <tr style="border-bottom: 1px solid #eee; background-color: {{ $rowBg }};">
                     <td style="padding: 12px; font-weight: 500;">{{ $customer->name }}</td>
                     <td style="padding: 12px;"><code style="background: #f1f1f1; padding: 2px 4px; border-radius: 3px;">{{ $customer->username }}</code></td>
-                    <td style="padding: 12px;">{{ $customer->package->name }}</td>
+                    <td style="padding: 12px;">{{ $customer->package->name ?? '-' }}</td>
+                    <td style="padding: 12px;">Tgl {{ $customer->billing_date }}</td>
                     <td style="padding: 12px;">
-                        <span style="background: {{ $customer->status == 'active' ? '#e8f5e9' : '#ffebee' }}; 
-                                     color: {{ $customer->status == 'active' ? '#2e7d32' : '#c62828' }}; 
+                        @if($customer->due_date)
+                            <span style="color: {{ $isOverdue ? '#c62828' : '#2c3e50' }}; font-weight: {{ $isOverdue ? 'bold' : 'normal' }};">
+                                {{ \Carbon\Carbon::parse($customer->due_date)->format('d M Y') }}
+                            </span>
+                        @else
+                            -
+                        @endif
+                    </td>
+                    <td style="padding: 12px;">
+                        @php
+                            $isOverdue = $customer->due_date && \Carbon\Carbon::parse($customer->due_date)->isPast() && $customer->payment_status !== 'paid';
+                            $deviceOnline = $customer->device ? $customer->device->is_online : false;
+                            
+                            $statusColor = '#2e7d32'; // Green (Active)
+                            $statusText = 'ACTIVE';
+                            
+                            if ($isOverdue) {
+                                $statusColor = '#c62828'; // Red (Expired)
+                                $statusText = 'EXPIRED';
+                            } elseif (!$deviceOnline) {
+                                $statusColor = '#7f8c8d'; // Gray (Offline)
+                                $statusText = 'OFFLINE';
+                            }
+                        @endphp
+
+                        <span style="background: {{ $customer->payment_status == 'paid' ? '#e8f5e9' : ($customer->payment_status == 'unpaid' ? '#fff3e0' : '#ffebee') }}; 
+                                     color: {{ $customer->payment_status == 'paid' ? '#2e7d32' : ($customer->payment_status == 'unpaid' ? '#e65100' : '#c62828') }}; 
                                      padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
-                            {{ strtoupper($customer->status) }}
+                            {{ strtoupper($customer->payment_status) }}
+                        </span>
+                        <br>
+                        <span style="background: {{ $statusColor }}22; 
+                                     color: {{ $statusColor }}; 
+                                     padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; margin-top: 4px; display: inline-block; border: 1px solid {{ $statusColor }}44;">
+                            INET: {{ $statusText }}
                         </span>
                     </td>
-                    <td style="padding: 12px; color: #7f8c8d; font-size: 0.9rem;">{{ $customer->created_at->format('d M Y') }}</td>
                     <td style="padding: 12px; text-align: center;">
                         <a href="{{ route('customers.edit', $customer) }}" style="color: var(--accent-color); margin-right: 10px; text-decoration: none;">
                             <i class="fas fa-edit"></i>

@@ -60,10 +60,44 @@
             @error('package_id') <div class="error-msg">{{ $message }}</div> @enderror
         </div>
 
-        <div class="form-group">
-            <label for="telegram_id">ID Telegram (Opsional)</label>
-            <input type="text" name="telegram_id" id="telegram_id" class="form-control" value="{{ old('telegram_id') }}" placeholder="Contoh: 123456789">
-            <small style="color: #95a5a6;">Untuk pengiriman notifikasi tagihan dan alert.</small>
+        <!-- Billing Info -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee;">
+            <h3 style="margin-top: 0; font-size: 1rem; color: #2c3e50;"><i class="fas fa-file-invoice-dollar"></i> Informasi Tagihan</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="billing_date">Tanggal Tagihan (Setiap Bulan)</label>
+                    <input type="number" name="billing_date" id="billing_date" class="form-control" value="{{ old('billing_date', 1) }}" min="1" max="31" required>
+                    @error('billing_date') <div class="error-msg">{{ $message }}</div> @enderror
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="due_date">Jatuh Tempo (Bulan Ini)</label>
+                    <input type="date" name="due_date" id="due_date" class="form-control" value="{{ old('due_date') }}">
+                    @error('due_date') <div class="error-msg">{{ $message }}</div> @enderror
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px; margin-bottom: 0;">
+                <label for="payment_status">Status Pembayaran</label>
+                <select name="payment_status" id="payment_status" class="form-control" required>
+                    <option value="paid" {{ old('payment_status') == 'paid' ? 'selected' : '' }}>Lunas (Paid)</option>
+                    <option value="unpaid" {{ old('payment_status') == 'unpaid' ? 'selected' : '' }}>Belum Bayar (Unpaid)</option>
+                    <option value="isolated" {{ old('payment_status') == 'isolated' ? 'selected' : '' }}>Isolir (Isolated)</option>
+                </select>
+                @error('payment_status') <div class="error-msg">{{ $message }}</div> @enderror
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="form-group">
+                <label for="phone">Nomor WA/HP (Wajib)</label>
+                <input type="text" name="phone" id="phone" class="form-control" value="{{ old('phone') }}" placeholder="08123456789" required>
+                <small style="color: #95a5a6;">Gunakan format 08xxx atau 62xxx. Digunakan untuk identitas Telegram.</small>
+            </div>
+            <div class="form-group">
+                <label for="telegram_chat_id">Telegram Chat ID</label>
+                <input type="text" name="telegram_chat_id" id="telegram_chat_id" class="form-control" value="{{ old('telegram_chat_id') }}" placeholder="Otomatis terisi saat chat bot" readonly>
+            </div>
         </div>
 
         <div style="margin-top: 30px; display: flex; gap: 10px;">
